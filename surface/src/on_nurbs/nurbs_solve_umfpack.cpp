@@ -40,6 +40,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <stdexcept>
+#include <ctime>
 
 #include <pcl/surface/on_nurbs/nurbs_solve.h>
 
