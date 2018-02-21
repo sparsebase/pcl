@@ -35,8 +35,8 @@
  *
  */
 
-#include <suitesparse/cholmod.h>
-#include <suitesparse/umfpack.h>
+#include <cholmod.h>
+#include <umfpack.h>
 #include <iostream>
 #include <stdio.h>
 #include <stdexcept>
