@@ -196,8 +196,8 @@ namespace pcl
         return (false);
 
       return (fabs (thrust::raw_reference_cast(thrust::get<0>(t)).x * coefficients.x +
-					thrust::raw_reference_cast(thrust::get<0>(t)).y * coefficients.y +
-					thrust::raw_reference_cast(thrust::get<0>(t)).z * coefficients.z + coefficients.w) < threshold);
+                    thrust::raw_reference_cast(thrust::get<0>(t)).y * coefficients.y +
+                    thrust::raw_reference_cast(thrust::get<0>(t)).z * coefficients.z + coefficients.w) < threshold);
     }
 
     //////////////////////////////////////////////////////////////////////////
