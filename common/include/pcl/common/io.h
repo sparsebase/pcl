@@ -38,8 +38,7 @@
  *
  */
 
-#ifndef PCL_COMMON_IO_H_
-#define PCL_COMMON_IO_H_
+#pragma once
 
 #include <string>
 #include <pcl/pcl_base.h>
@@ -51,7 +50,7 @@
 namespace pcl
 {
   /** \brief Get the index of a specified field (i.e., dimension/channel)
-    * \param[in] cloud the the point cloud message
+    * \param[in] cloud the point cloud message
     * \param[in] field_name the string defining the field name
     * \ingroup common
     */
@@ -66,7 +65,7 @@ namespace pcl
   }
 
   /** \brief Get the index of a specified field (i.e., dimension/channel)
-    * \param[in] cloud the the point cloud message
+    * \param[in] cloud the point cloud message
     * \param[in] field_name the string defining the field name
     * \param[out] fields a vector to the original \a PCLPointField vector that the raw PointCloud message contains
     * \ingroup common
@@ -100,7 +99,7 @@ namespace pcl
   getFields (std::vector<pcl::PCLPointField> &fields);
 
   /** \brief Get the list of all fields available in a given cloud
-    * \param[in] cloud the the point cloud message
+    * \param[in] cloud the point cloud message
     * \ingroup common
     */
   template <typename PointT> inline std::string 
@@ -532,6 +531,3 @@ namespace pcl
 }
 
 #include <pcl/common/impl/io.hpp>
-
-#endif  //#ifndef PCL_COMMON_IO_H_
-

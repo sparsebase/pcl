@@ -52,12 +52,8 @@
 #include <vtkMapper.h>
 #include <vtkDataSetMapper.h>
 
-#if VTK_MAJOR_VERSION>=6 || (VTK_MAJOR_VERSION==5 && VTK_MINOR_VERSION>4)
 #include <vtkHardwareSelector.h>
 #include <vtkSelectionNode.h>
-#else
-#include <vtkVisibleCellSelector.h>
-#endif
 
 #include <vtkSelection.h>
 #include <vtkPointPicker.h>
@@ -96,11 +92,19 @@
 #include <vtkLookupTable.h>
 #include <vtkTextureUnitManager.h>
 
+#if VTK_MAJOR_VERSION > 7
+#include <vtkTexture.h>
+#endif
+
 #include <pcl/visualization/common/shapes.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/common/common.h>
 #include <pcl/common/time.h>
+#if (BOOST_VERSION >= 106600)
+#include <boost/uuid/detail/sha1.hpp>
+#else
 #include <boost/uuid/sha1.hpp>
+#endif
 #include <boost/filesystem.hpp>
 #include <pcl/console/parse.h>
 
@@ -121,10 +125,8 @@
 pcl::visualization::PCLVisualizer::PCLVisualizer (const std::string &name, const bool create_interactor)
   : interactor_ ()
   , update_fps_ (vtkSmartPointer<FPSCallback>::New ())
-#if !((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
   , stopped_ ()
   , timer_id_ ()
-#endif
   , exit_main_loop_timer_callback_ ()
   , exit_callback_ ()
   , rens_ (vtkSmartPointer<vtkRendererCollection>::New ())
@@ -151,10 +153,8 @@ pcl::visualization::PCLVisualizer::PCLVisualizer (const std::string &name, const
 pcl::visualization::PCLVisualizer::PCLVisualizer (int &argc, char **argv, const std::string &name, PCLVisualizerInteractorStyle* style, const bool create_interactor)
   : interactor_ ()
   , update_fps_ (vtkSmartPointer<FPSCallback>::New ())
-#if !((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
   , stopped_ ()
   , timer_id_ ()
-#endif
   , exit_main_loop_timer_callback_ ()
   , exit_callback_ ()
   , rens_ (vtkSmartPointer<vtkRendererCollection>::New ())
@@ -188,10 +188,8 @@ pcl::visualization::PCLVisualizer::PCLVisualizer (vtkSmartPointer<vtkRenderer> r
                                                   const std::string &name, const bool create_interactor)
   : interactor_ ()
   , update_fps_ (vtkSmartPointer<FPSCallback>::New ())
-#if !((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
   , stopped_ ()
   , timer_id_ ()
-#endif
   , exit_main_loop_timer_callback_ ()
   , exit_callback_ ()
   , rens_ (vtkSmartPointer<vtkRendererCollection>::New ())
@@ -218,10 +216,8 @@ pcl::visualization::PCLVisualizer::PCLVisualizer (int &argc, char **argv, vtkSma
                                                   const std::string &name, PCLVisualizerInteractorStyle* style, const bool create_interactor)
   : interactor_ ()
   , update_fps_ (vtkSmartPointer<FPSCallback>::New ())
-#if !((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
   , stopped_ ()
   , timer_id_ ()
-#endif
   , exit_main_loop_timer_callback_ ()
   , exit_callback_ ()
   , rens_ (vtkSmartPointer<vtkRendererCollection>::New ())
@@ -251,12 +247,8 @@ pcl::visualization::PCLVisualizer::PCLVisualizer (int &argc, char **argv, vtkSma
 void
 pcl::visualization::PCLVisualizer::createInteractor ()
 {
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-  interactor_ = vtkSmartPointer<PCLVisualizerInteractor>::New ();
-#else
   //interactor_ = vtkSmartPointer<vtkRenderWindowInteractor>::New ();
   interactor_ = vtkSmartPointer <vtkRenderWindowInteractor>::Take (vtkRenderWindowInteractorFixNew ());
-#endif
 
   //win_->PointSmoothingOn ();
   //win_->LineSmoothingOn ();
@@ -275,11 +267,7 @@ pcl::visualization::PCLVisualizer::createInteractor ()
 
   // Initialize and create timer, also create window
   interactor_->Initialize ();
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-  interactor_->timer_id_ = interactor_->CreateRepeatingTimer (5000L);
-#else
   timer_id_ = interactor_->CreateRepeatingTimer (5000L);
-#endif
 
   // Set a simple PointPicker
   vtkSmartPointer<vtkPointPicker> pp = vtkSmartPointer<vtkPointPicker>::New ();
@@ -455,11 +443,7 @@ void pcl::visualization::PCLVisualizer::setupCamera (int &argc, char **argv)
 pcl::visualization::PCLVisualizer::~PCLVisualizer ()
 {
   if (interactor_ != NULL)
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-    interactor_->DestroyTimer (interactor_->timer_id_);
-#else
     interactor_->DestroyTimer (timer_id_);
-#endif
   // Clear the collections
   rens_->RemoveAllItems ();
 }
@@ -543,8 +527,7 @@ void
 pcl::visualization::PCLVisualizer::spinOnce (int time, bool force_redraw)
 {
   resetStoppedFlag ();
-  #if (defined (__APPLE__)\
-    && ( (VTK_MAJOR_VERSION > 6) || ( (VTK_MAJOR_VERSION == 6) && (VTK_MINOR_VERSION >= 1))))
+  #if (defined (__APPLE__))
     if (!win_->IsDrawable ())
     {
       close ();
@@ -633,21 +616,13 @@ pcl::visualization::PCLVisualizer::addCoordinateSystem (double scale, const std:
   axes_data->GetPointData ()->SetScalars (axes_colors);
 
   vtkSmartPointer<vtkTubeFilter> axes_tubes = vtkSmartPointer<vtkTubeFilter>::New ();
-#if VTK_MAJOR_VERSION < 6
-  axes_tubes->SetInput (axes_data);
-#else
   axes_tubes->SetInputData (axes_data);
-#endif
   axes_tubes->SetRadius (axes->GetScaleFactor () / 50.0);
   axes_tubes->SetNumberOfSides (6);
 
   vtkSmartPointer<vtkPolyDataMapper> axes_mapper = vtkSmartPointer<vtkPolyDataMapper>::New ();
   axes_mapper->SetScalarModeToUsePointData ();
-#if VTK_MAJOR_VERSION < 6
-  axes_mapper->SetInput (axes_tubes->GetOutput ());
-#else
   axes_mapper->SetInputConnection (axes_tubes->GetOutputPort ());
-#endif
 
   vtkSmartPointer<vtkLODActor> axes_actor = vtkSmartPointer<vtkLODActor>::New ();
   axes_actor->SetMapper (axes_mapper);
@@ -682,21 +657,13 @@ pcl::visualization::PCLVisualizer::addCoordinateSystem (double scale, float x, f
   axes_data->GetPointData ()->SetScalars (axes_colors);
 
   vtkSmartPointer<vtkTubeFilter> axes_tubes = vtkSmartPointer<vtkTubeFilter>::New ();
-#if VTK_MAJOR_VERSION < 6
-  axes_tubes->SetInput (axes_data);
-#else
   axes_tubes->SetInputData (axes_data);
-#endif
   axes_tubes->SetRadius (axes->GetScaleFactor () / 50.0);
   axes_tubes->SetNumberOfSides (6);
 
   vtkSmartPointer<vtkPolyDataMapper> axes_mapper = vtkSmartPointer<vtkPolyDataMapper>::New ();
   axes_mapper->SetScalarModeToUsePointData ();
-#if VTK_MAJOR_VERSION < 6
-  axes_mapper->SetInput (axes_tubes->GetOutput ());
-#else
   axes_mapper->SetInputConnection (axes_tubes->GetOutputPort ());
-#endif
 
   vtkSmartPointer<vtkLODActor> axes_actor = vtkSmartPointer<vtkLODActor>::New ();
   axes_actor->SetMapper (axes_mapper);
@@ -762,21 +729,13 @@ pcl::visualization::PCLVisualizer::addCoordinateSystem (double scale, const Eige
   axes_data->GetPointData ()->SetScalars (axes_colors);
 
   vtkSmartPointer<vtkTubeFilter> axes_tubes = vtkSmartPointer<vtkTubeFilter>::New ();
-#if VTK_MAJOR_VERSION < 6
-  axes_tubes->SetInput (axes_data);
-#else
   axes_tubes->SetInputData (axes_data);
-#endif
   axes_tubes->SetRadius (axes->GetScaleFactor () / 50.0);
   axes_tubes->SetNumberOfSides (6);
 
   vtkSmartPointer<vtkPolyDataMapper> axes_mapper = vtkSmartPointer<vtkPolyDataMapper>::New ();
   axes_mapper->SetScalarModeToUsePointData ();
-#if VTK_MAJOR_VERSION < 6
-  axes_mapper->SetInput (axes_tubes->GetOutput ());
-#else
   axes_mapper->SetInputConnection (axes_tubes->GetOutputPort ());
-#endif
 
   vtkSmartPointer<vtkLODActor> axes_actor = vtkSmartPointer<vtkLODActor>::New ();
   axes_actor->SetMapper (axes_mapper);
@@ -1197,11 +1156,7 @@ pcl::visualization::PCLVisualizer::createActorFromVTKDataSet (const vtkSmartPoin
 #endif
   {
     vtkSmartPointer<vtkDataSetMapper> mapper = vtkSmartPointer<vtkDataSetMapper>::New ();
-#if VTK_MAJOR_VERSION < 6
-    mapper->SetInput (data);
-#else
     mapper->SetInputData (data);
-#endif
 
     if (use_scalars)
     {
@@ -1279,11 +1234,7 @@ pcl::visualization::PCLVisualizer::createActorFromVTKDataSet (const vtkSmartPoin
 #endif
   {
     vtkSmartPointer<vtkDataSetMapper> mapper = vtkSmartPointer<vtkDataSetMapper>::New ();
-#if VTK_MAJOR_VERSION < 6
-    mapper->SetInput (data);
-#else
     mapper->SetInputData (data);
-#endif
 
     if (use_scalars)
     {
@@ -1871,13 +1822,8 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
           {
             PCL_INFO ("[pcl::visualization::PCLVisualizer::setShapeRenderingProperties] Normals do not exist in the dataset, but Gouraud shading was requested. Estimating normals...\n");
             vtkSmartPointer<vtkPolyDataNormals> normals = vtkSmartPointer<vtkPolyDataNormals>::New ();
-#if VTK_MAJOR_VERSION < 6
-            normals->SetInput (actor->GetMapper ()->GetInput ());
-            vtkDataSetMapper::SafeDownCast (actor->GetMapper ())->SetInput (normals->GetOutput ());
-#else
             normals->SetInputConnection (actor->GetMapper ()->GetInputAlgorithm ()->GetOutputPort ());
             vtkDataSetMapper::SafeDownCast (actor->GetMapper ())->SetInputConnection (normals->GetOutputPort ());
-#endif
           }
           actor->GetProperty ()->SetInterpolationToGouraud ();
           break;
@@ -1888,13 +1834,8 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
           {
             PCL_INFO ("[pcl::visualization::PCLVisualizer::setShapeRenderingProperties] Normals do not exist in the dataset, but Phong shading was requested. Estimating normals...\n");
             vtkSmartPointer<vtkPolyDataNormals> normals = vtkSmartPointer<vtkPolyDataNormals>::New ();
-#if VTK_MAJOR_VERSION < 6
-            normals->SetInput (actor->GetMapper ()->GetInput ());
-            vtkDataSetMapper::SafeDownCast (actor->GetMapper ())->SetInput (normals->GetOutput ());
-#else
             normals->SetInputConnection (actor->GetMapper ()->GetInputAlgorithm ()->GetOutputPort ());
             vtkDataSetMapper::SafeDownCast (actor->GetMapper ())->SetInputConnection (normals->GetOutputPort ());
-#endif
           }
           actor->GetProperty ()->SetInterpolationToPhong ();
           break;
@@ -2544,11 +2485,7 @@ pcl::visualization::PCLVisualizer::addModelFromPolyData (
 
   vtkSmartPointer <vtkTransformFilter> trans_filter = vtkSmartPointer<vtkTransformFilter>::New ();
   trans_filter->SetTransform (transform);
-#if VTK_MAJOR_VERSION < 6
-  trans_filter->SetInput (polydata);
-#else
   trans_filter->SetInputData (polydata);
-#endif
   trans_filter->Update ();
 
   // Create an Actor
@@ -3071,11 +3008,7 @@ pcl::visualization::PCLVisualizer::updateColorHandlerIndex (const std::string &i
     vtkPolyDataMapper* mapper = static_cast<vtkPolyDataMapper*>(am_it->second.actor->GetMapper ());
     mapper->SetScalarRange (minmax);
     mapper->SetScalarModeToUsePointData ();
-#if VTK_MAJOR_VERSION < 6
-    mapper->SetInput (data);
-#else
     mapper->SetInputData (data);
-#endif
     // Modify the actor
     am_it->second.actor->SetMapper (mapper);
     am_it->second.actor->Modified ();
@@ -3360,11 +3293,7 @@ pcl::visualization::PCLVisualizer::addPolylineFromPolygonMesh (
 
   // Setup actor and mapper
   vtkSmartPointer < vtkPolyDataMapper > mapper = vtkSmartPointer<vtkPolyDataMapper>::New ();
-#if VTK_MAJOR_VERSION < 6
-  mapper->SetInput (polyData);
-#else
   mapper->SetInputData (polyData);
-#endif
 
   vtkSmartPointer < vtkActor > actor = vtkSmartPointer<vtkActor>::New ();
   actor->SetMapper (mapper);
@@ -3500,92 +3429,62 @@ pcl::visualization::PCLVisualizer::addTextureMesh (const pcl::TextureMesh &mesh,
     polydata->GetPointData ()->SetScalars (colors);
 
   vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New ();
-#if VTK_MAJOR_VERSION < 6
-    mapper->SetInput (polydata);
-#else
-    mapper->SetInputData (polydata);
-#endif
+  mapper->SetInputData (polydata);
 
   vtkSmartPointer<vtkLODActor> actor = vtkSmartPointer<vtkLODActor>::New ();
   vtkTextureUnitManager* tex_manager = vtkOpenGLRenderWindow::SafeDownCast (win_)->GetTextureUnitManager ();
   if (!tex_manager)
     return (false);
-  // Check if hardware support multi texture
+  // hardware always supports multitexturing of some degree
   int texture_units = tex_manager->GetNumberOfTextureUnits ();
-  if ((mesh.tex_materials.size () > 1) && (texture_units > 1))
+  if ((size_t) texture_units < mesh.tex_materials.size ())
+    PCL_WARN ("[PCLVisualizer::addTextureMesh] GPU texture units %d < mesh textures %d!\n",
+              texture_units, mesh.tex_materials.size ());
+  // Load textures
+  std::size_t last_tex_id = std::min (static_cast<int> (mesh.tex_materials.size ()), texture_units);
+  std::size_t tex_id = 0;
+  while (tex_id < last_tex_id)
   {
-    if ((size_t) texture_units < mesh.tex_materials.size ())
-      PCL_WARN ("[PCLVisualizer::addTextureMesh] GPU texture units %d < mesh textures %d!\n",
-                texture_units, mesh.tex_materials.size ());
-    // Load textures
-    std::size_t last_tex_id = std::min (static_cast<int> (mesh.tex_materials.size ()), texture_units);
-    int tu = vtkProperty::VTK_TEXTURE_UNIT_0;
-    std::size_t tex_id = 0;
-    while (tex_id < last_tex_id)
-    {
-      vtkSmartPointer<vtkTexture> texture = vtkSmartPointer<vtkTexture>::New ();
-      if (textureFromTexMaterial (mesh.tex_materials[tex_id], texture))
-      {
-        PCL_WARN ("[PCLVisualizer::addTextureMesh] Failed to load texture %s, skipping!\n",
-                  mesh.tex_materials[tex_id].tex_name.c_str ());
-        continue;
-      }
-      // the first texture is in REPLACE mode others are in ADD mode
-      if (tex_id == 0)
-        texture->SetBlendingMode(vtkTexture::VTK_TEXTURE_BLENDING_MODE_REPLACE);
-      else
-        texture->SetBlendingMode(vtkTexture::VTK_TEXTURE_BLENDING_MODE_ADD);
-      // add a texture coordinates array per texture
-      vtkSmartPointer<vtkFloatArray> coordinates = vtkSmartPointer<vtkFloatArray>::New ();
-      coordinates->SetNumberOfComponents (2);
-      std::stringstream ss; ss << "TCoords" << tex_id;
-      std::string this_coordinates_name = ss.str ();
-      coordinates->SetName (this_coordinates_name.c_str ());
-
-      for (std::size_t t = 0; t < mesh.tex_coordinates.size (); ++t)
-        if (t == tex_id)
-          for (std::size_t tc = 0; tc < mesh.tex_coordinates[t].size (); ++tc)
-            coordinates->InsertNextTuple2 (mesh.tex_coordinates[t][tc][0],
-                                           mesh.tex_coordinates[t][tc][1]);
-        else
-          for (std::size_t tc = 0; tc < mesh.tex_coordinates[t].size (); ++tc)
-            coordinates->InsertNextTuple2 (-1.0, -1.0);
-
-      mapper->MapDataArrayToMultiTextureAttribute(tu,
-                                                  this_coordinates_name.c_str (),
-                                                  vtkDataObject::FIELD_ASSOCIATION_POINTS);
-      polydata->GetPointData ()->AddArray (coordinates);
-      actor->GetProperty ()->SetTexture (tu, texture);
-      ++tex_id;
-      ++tu;
-    }
-  } // end of multi texturing
-  else
-  {
-    if ((mesh.tex_materials.size () > 1) && (texture_units < 2))
-      PCL_WARN ("[PCLVisualizer::addTextureMesh] Your GPU doesn't support multi texturing. "
-                "Will use first one only!\n");
-
+#if (VTK_MAJOR_VERSION == 8 && VTK_MINOR_VERSION >= 2) || VTK_MAJOR_VERSION > 8
+    const char *tu = mesh.tex_materials[tex_id].tex_name.c_str();
+#else
+    int tu = vtkProperty::VTK_TEXTURE_UNIT_0 + tex_id;
+#endif
     vtkSmartPointer<vtkTexture> texture = vtkSmartPointer<vtkTexture>::New ();
-    // fill vtkTexture from pcl::TexMaterial structure
-    if (textureFromTexMaterial (mesh.tex_materials[0], texture))
-      PCL_WARN ("[PCLVisualizer::addTextureMesh] Failed to create vtkTexture from %s!\n",
-                mesh.tex_materials[0].tex_name.c_str ());
-
-    // set texture coordinates
+    if (textureFromTexMaterial (mesh.tex_materials[tex_id], texture))
+    {
+      PCL_WARN ("[PCLVisualizer::addTextureMesh] Failed to load texture %s, skipping!\n",
+                mesh.tex_materials[tex_id].tex_name.c_str ());
+      continue;
+    }
+    // the first texture is in REPLACE mode others are in ADD mode
+    if (tex_id == 0)
+      texture->SetBlendingMode(vtkTexture::VTK_TEXTURE_BLENDING_MODE_REPLACE);
+    else
+      texture->SetBlendingMode(vtkTexture::VTK_TEXTURE_BLENDING_MODE_ADD);
+    // add a texture coordinates array per texture
     vtkSmartPointer<vtkFloatArray> coordinates = vtkSmartPointer<vtkFloatArray>::New ();
     coordinates->SetNumberOfComponents (2);
-    coordinates->SetNumberOfTuples (mesh.tex_coordinates[0].size ());
-    for (std::size_t tc = 0; tc < mesh.tex_coordinates[0].size (); ++tc)
-    {
-      const Eigen::Vector2f &uv = mesh.tex_coordinates[0][tc];
-      coordinates->SetTuple2 (tc, uv[0], uv[1]);
-    }
-    coordinates->SetName ("TCoords");
-    polydata->GetPointData ()->SetTCoords (coordinates);
-    // apply texture
-    actor->SetTexture (texture);
-  } // end of one texture
+    std::stringstream ss; ss << "TCoords" << tex_id;
+    std::string this_coordinates_name = ss.str ();
+    coordinates->SetName (this_coordinates_name.c_str ());
+
+    for (std::size_t t = 0; t < mesh.tex_coordinates.size (); ++t)
+      if (t == tex_id)
+        for (std::size_t tc = 0; tc < mesh.tex_coordinates[t].size (); ++tc)
+          coordinates->InsertNextTuple2 (mesh.tex_coordinates[t][tc][0],
+                                         mesh.tex_coordinates[t][tc][1]);
+      else
+        for (std::size_t tc = 0; tc < mesh.tex_coordinates[t].size (); ++tc)
+          coordinates->InsertNextTuple2 (-1.0, -1.0);
+    mapper->MapDataArrayToMultiTextureAttribute(tu,
+      this_coordinates_name.c_str(),
+      vtkDataObject::FIELD_ASSOCIATION_POINTS);
+    
+    polydata->GetPointData ()->AddArray (coordinates);
+    actor->GetProperty ()->SetTexture (tu, texture);
+    ++tex_id;
+  }
 
   // set mapper
   actor->SetMapper (mapper);
@@ -3737,11 +3636,7 @@ pcl::visualization::PCLVisualizer::renderViewTesselatedSphere (
 
   vtkSmartPointer<vtkTransformFilter> trans_filter_center = vtkSmartPointer<vtkTransformFilter>::New ();
   trans_filter_center->SetTransform (trans_center);
-#if VTK_MAJOR_VERSION < 6
-  trans_filter_center->SetInput (polydata);
-#else
   trans_filter_center->SetInputData (polydata);
-#endif
   trans_filter_center->Update ();
 
   vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New ();
@@ -3858,7 +3753,7 @@ pcl::visualization::PCLVisualizer::renderViewTesselatedSphere (
   cam->SetViewAngle (view_angle);
   cam->Modified ();
 
-  //For each camera position, traposesnsform the object and render view
+  //For each camera position, transform the object and render view
   for (size_t i = 0; i < cam_positions.size (); i++)
   {
     cam_pos[0] = cam_positions[i][0];
@@ -4007,38 +3902,6 @@ pcl::visualization::PCLVisualizer::renderViewTesselatedSphere (
     /////////////////////////////////////
     // * Select visible cells (triangles)
     /////////////////////////////////////
-#if  (VTK_MAJOR_VERSION==5 && VTK_MINOR_VERSION<6)
-
-    vtkSmartPointer<vtkVisibleCellSelector> selector = vtkSmartPointer<vtkVisibleCellSelector>::New ();
-    vtkSmartPointer<vtkIdTypeArray> selection = vtkSmartPointer<vtkIdTypeArray>::New ();
-
-    selector->SetRenderer (renderer);
-    selector->SetArea (0, 0, xres - 1, yres - 1);
-    selector->Select ();
-    selector->GetSelectedIds (selection);
-
-    double visible_area = 0;
-    for (int sel_id = 3; sel_id < (selection->GetNumberOfTuples () * selection->GetNumberOfComponents ()); sel_id
-        += selection->GetNumberOfComponents ())
-    {
-      int id_mesh = selection->GetValue (sel_id);
-
-      if (id_mesh >= polydata->GetNumberOfCells ())
-        continue;
-
-      vtkCell * cell = polydata->GetCell (id_mesh);
-      vtkTriangle* triangle = dynamic_cast<vtkTriangle*> (cell);
-      double p0[3];
-      double p1[3];
-      double p2[3];
-      triangle->GetPoints ()->GetPoint (0, p0);
-      triangle->GetPoints ()->GetPoint (1, p1);
-      triangle->GetPoints ()->GetPoint (2, p2);
-      visible_area += vtkTriangle::TriangleArea (p0, p1, p2);
-    }
-
-#else
-    //THIS CAN BE USED WHEN VTK >= 5.4 IS REQUIRED... vtkVisibleCellSelector is deprecated from VTK5.4
     vtkSmartPointer<vtkHardwareSelector> hardware_selector = vtkSmartPointer<vtkHardwareSelector>::New ();
     hardware_selector->ClearBuffers ();
     vtkSmartPointer<vtkSelection> hdw_selection = vtkSmartPointer<vtkSelection>::New ();
@@ -4077,7 +3940,6 @@ pcl::visualization::PCLVisualizer::renderViewTesselatedSphere (
       area = vtkTriangle::TriangleArea (p0, p1, p2);
       visible_area += area;
     }
-#endif
 
     enthropies.push_back (static_cast<float> (visible_area / totalArea));
 
@@ -4516,20 +4378,11 @@ pcl::visualization::PCLVisualizer::setSize (int xw, int yw)
 void
 pcl::visualization::PCLVisualizer::close ()
 {
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-  if (interactor_)
-  {
-    interactor_->stopped = true;
-    // This tends to close the window...
-    interactor_->stopLoop ();
-  }
-#else
   stopped_ = true;
   // This tends to close the window...
   win_->Finalize ();
   if (interactor_)
     interactor_->TerminateApp ();
-#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -4567,13 +4420,8 @@ bool
 pcl::visualization::PCLVisualizer::wasStopped () const
 {
   if (interactor_ != NULL)
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-    return (interactor_->stopped);
-#else
     return (stopped_);
-#endif
-  else
-    return (true);
+  return (true);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -4581,11 +4429,7 @@ void
 pcl::visualization::PCLVisualizer::resetStoppedFlag ()
 {
   if (interactor_ != NULL)
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-    interactor_->stopped = false;
-#else
     stopped_ = false;
-#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -4620,11 +4464,7 @@ pcl::visualization::PCLVisualizer::ExitMainLoopTimerCallback::Execute (
   if (timer_id != right_timer_id)
     return;
   // Stop vtk loop and send notification to app to wake it up
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-  pcl_visualizer->interactor_->stopLoop ();
-#else
   pcl_visualizer->interactor_->TerminateApp ();
-#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -4634,19 +4474,10 @@ pcl::visualization::PCLVisualizer::ExitCallback::Execute (
 {
   if (event_id != vtkCommand::ExitEvent)
     return;
-#if ((VTK_MAJOR_VERSION == 5) && (VTK_MINOR_VERSION <= 4))
-  if (pcl_visualizer->interactor_)
-  {
-    pcl_visualizer->interactor_->stopped = true;
-    // This tends to close the window...
-    pcl_visualizer->interactor_->stopLoop ();
-  }
-#else
   pcl_visualizer->stopped_ = true;
   // This tends to close the window...
   if (pcl_visualizer->interactor_)
     pcl_visualizer->interactor_->TerminateApp ();
-#endif
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
